@@ -33,7 +33,7 @@ intermediate=df1[['MKioskTy1','MKioskTy2','MKioskTy3','MKioskTy4','MKioskTy5','M
 hospital=hospital.reset_index(drop=True)
 intermediate=intermediate.reset_index(drop=True)
 
-new_sympotom={'hospitalId':0,'deptEng':np.nan}
+new_sympotom={'HospitalId':0,'deptEng':np.nan}
 df=pd.DataFrame([new_sympotom])
 intermediate=intermediate.fillna('X')
 for i in range(63):
@@ -41,6 +41,16 @@ for i in range(63):
         if intermediate.loc[i][j]=='Y':
             df.loc[df.shape[0]]=[i+1,intermediate.columns[j]]
 intermediate=pd.DataFrame(df[1:])
+
+department=pd.DataFrame({'deptEng':["MKioskTy1", "MKioskTy2", "MKioskTy3","MKioskTy4","MKioskTy5","MKioskTy6","MKioskTy7","MKioskTy8","MKioskTy10","MKioskTy11"],
+                             'deptKor':["뇌출혈수술", '뇌경색의재관류', '심근경색의재관류',"복부손상의수술","사지접합의수술","응급내시경","응급투석","조산산모","정신질환자","신생아"]})
+
+
+deptId=[]
+for i in intermediate.deptEng:
+    deptId.append(department[department['deptEng']==i].index[0]+1)
+intermediate['DepartmentId']=deptId
+
 intermediate.to_csv("intermediate.csv", mode='w',index=False)
 hospital.to_csv("hospital.csv", mode='w',index=False)
 
@@ -61,13 +71,15 @@ symptom = pd.DataFrame({'deptEng':["MKioskTy1", "MKioskTy2","MKioskTy5","MKioskT
                              '의식이 혼미한 경우 찬물이나 기응환 등을 먹이지 않는다,꼭 이동해야 하는 상황이 아니라면 119에 신고하고 아이를 그대로 눕혀둔다.']
                              })
 
-department=pd.DataFrame({'deptEng':["MKioskTy1", "MKioskTy2", "MKioskTy3","MKioskTy4","MKioskTy5","MKioskTy6","MKioskTy7","MKioskTy8","MKioskTy10","MKioskTy11"],
-                             'deptKor':["뇌출혈수술", '뇌경색의재관류', '심근경색의재관류',"복부손상의수술","사지접합의수술","응급내시경","응급투석","조산산모","정신질환자","신생아"]})
-
+deptId=[]
+for i in symptom.deptEng:
+    deptId.append(department[department['deptEng']==i].index[0]+1)
+symptom['DepartmentId']=deptId
 
 hospital.index=hospital.index + 1
 
-hospital.to_sql(name='hospital', con=connection, if_exists='replace', index=True)
-intermediate.to_sql(name='intermediate', con=connection, if_exists='replace', index=True)
-symptom.to_sql(name='symptom', con=connection, if_exists='replace', index=True)
-department.to_sql(name='department', con=connection, if_exists='replace', index=True)
+hospital.to_sql(name='hospital', con=connection, if_exists='append', index=False)
+department.to_sql(name='department', con=connection, if_exists='append', index=False)
+intermediate.to_sql(name='intermediate', con=connection, if_exists='append', index=False)
+symptom.to_sql(name='symptom', con=connection, if_exists='append', index=False)
+
