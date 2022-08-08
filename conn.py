@@ -6,14 +6,16 @@ import xmltodict
 import numpy as np
 import sqlalchemy as db
 pymysql.install_as_MySQLdb()
-engine = db.create_engine('mysql+pymysql://hack4:0713@192.168.219.102:3306/hack4')
+engine = db.create_engine('mysql+pymysql://hack4:0713@172.20.10.2:3306/hack4')
 connection = engine.connect()
 
+# 데이터 받아옴
 url = 'http://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytBassInfoInqire'
 params ={'serviceKey' : 'hfzncuRhJl7xxmV/wnG71VN/zxfeLPlvNfyvgbFTRdow1TGIx9ok+7L7bSx1YmCfKGsCzcOEQFZatI5UU84eyQ==','pageNo' :'1' ,'numOfRows':'100'}
 
 response = requests.get(url, params=params)
 jsonStr=json.dumps(xmltodict.parse(response.text))
+
 json_1=json.loads(jsonStr)
 total_df=pd.DataFrame(json_1['response']['body']['items']['item'])
 
@@ -33,6 +35,7 @@ intermediate=df1[['MKioskTy1','MKioskTy2','MKioskTy3','MKioskTy4','MKioskTy5','M
 hospital=hospital.reset_index(drop=True)
 intermediate=intermediate.reset_index(drop=True)
 
+# intermediate table 정의
 new_sympotom={'HospitalId':0,'deptEng':np.nan}
 df=pd.DataFrame([new_sympotom])
 intermediate=intermediate.fillna('X')
@@ -42,19 +45,20 @@ for i in range(63):
             df.loc[df.shape[0]]=[i+1,intermediate.columns[j]]
 intermediate=pd.DataFrame(df[1:])
 
+# department table 정의
 department=pd.DataFrame({'deptEng':["MKioskTy1", "MKioskTy2", "MKioskTy3","MKioskTy4","MKioskTy5","MKioskTy6","MKioskTy7","MKioskTy8","MKioskTy10","MKioskTy11"],
                              'deptKor':["뇌출혈수술", '뇌경색의재관류', '심근경색의재관류',"복부손상의수술","사지접합의수술","응급내시경","응급투석","조산산모","정신질환자","신생아"]})
 
-
+# department table 과 intermediate table 1 : n
 deptId=[]
 for i in intermediate.deptEng:
     deptId.append(department[department['deptEng']==i].index[0]+1)
 intermediate['DepartmentId']=deptId
 
-intermediate.to_csv("intermediate.csv", mode='w',index=False)
-hospital.to_csv("hospital.csv", mode='w',index=False)
+# intermediate.to_csv("intermediate.csv", mode='w',index=False)
+# hospital.to_csv("hospital.csv", mode='w',index=False)
 
-
+# symptom table 정의
 symptom = pd.DataFrame({'deptEng':["MKioskTy1", "MKioskTy2","MKioskTy5","MKioskTy5","MKioskTy11"],
                              'symptomName':["뇌출혈", '뇌졸중',"손가락절단","개에게 물림","소아 머리손상"],
                              'firstAid':[
@@ -71,6 +75,7 @@ symptom = pd.DataFrame({'deptEng':["MKioskTy1", "MKioskTy2","MKioskTy5","MKioskT
                              '의식이 혼미한 경우 찬물이나 기응환 등을 먹이지 않는다./꼭 이동해야 하는 상황이 아니라면 119에 신고하고 아이를 그대로 눕혀둔다.']
                              })
 
+# department table 과 symptom table 1 : n
 deptId=[]
 for i in symptom.deptEng:
     deptId.append(department[department['deptEng']==i].index[0]+1)
@@ -83,3 +88,10 @@ department.to_sql(name='department', con=connection, if_exists='append', index=F
 intermediate.to_sql(name='intermediate', con=connection, if_exists='append', index=False)
 symptom.to_sql(name='symptom', con=connection, if_exists='append', index=False)
 
+metadata = db.MetaData()
+host = db.Table('hospital', metadata, autoload=True, autoload_with=engine)
+query_select=db.select(host)
+end=len(engine.execute(query_select).fetchall())
+
+for i in range(1,end+1):
+    engine.execute(db.update(host).where(host.c.id == i).values(image="https://hack4.s3.ap-northeast-2.amazonaws.com/hostImage/"+str(i)+".jpg"))
